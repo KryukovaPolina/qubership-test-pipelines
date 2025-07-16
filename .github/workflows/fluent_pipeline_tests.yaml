@@ -1,0 +1,117 @@
+name: Fluent Pipeline Tests
+on:
+  workflow_call:
+    inputs:
+      logging_branch:
+        required: false
+        type: string
+        default: 'main'
+      fluent_test_branch:
+        required: false
+        type: string
+        default: 'feature/add-test-data'
+      pipeline_branch:
+        description: 'Test pipeline branch name'
+        type: string
+        required: false
+        default: 'main'
+      runner_type:
+        description: 'Runner type (self-hosted or ubuntu-latest)'
+        type: string
+        required: false
+        default: 'ubuntu-latest'
+jobs:
+  # Test fluent pipeline
+  Fluent-pipeline-test:
+    name: Fluent Pipeline Test
+    strategy:
+      fail-fast: false
+      matrix:
+        agent: ['fluentbit', 'fluentbit-ha']
+    runs-on: ${{inputs.runner_type}}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: '${{inputs.logging_branch}}'
+          repository: '${{github.repository_owner}}/qubership-logging-operator'
+          path: 'logging'
+      - name: Checkout fluent pipeline tests repository
+        uses: actions/checkout@v4
+        with:
+          ref: '${{inputs.fluent_test_branch}}'
+          repository: '${{github.repository_owner}}/qubership-fluent-pipeline-tests'
+          path: 'logging/fluent-pipeline-test'
+      - name: Run ${{matrix.agent}} pipeline tests
+        run: |
+          TEST_HOME_PATH=$(pwd)  
+          cd logging; sed -i 's/^@INCLUDE \/fluent-bit\/etc\/filter-unparsed-log-counter.conf$//' controllers/fluentbit/fluentbit.configmap/conf.d/fluent-bit.conf
+          apt-get -y install dos2unix; find fluent-pipeline-test/ -type f -exec dos2unix {};
+          cd fluent-pipeline-test
+          sed -i '
+            s/^#INT_TESTS_IGNORE=/INT_TESTS_IGNORE=/
+            s/^#FLUENTBIT_IMAGE=/FLUENTBIT_IMAGE=/
+            s/^#FLUENTD_IMAGE=/FLUENTD_IMAGE=/
+            s/^#FLUENT_PIPELINE_REPLACER_IMAGE=/FLUENT_PIPELINE_REPLACER_IMAGE=/
+            s/^TEST_HOME_PATH=.*$//g
+            s/^TEST_CONTENT_PATH=.*$//
+            s/^#TEST_CONTENT_PATH=.*$/TEST_CONTENT_PATH=".\/tests"/
+          ' run.sh
+          sed -i "s/^#TEST_HOME_PATH=.*$/TEST_HOME_PATH=$(echo "$TEST_HOME_PATH" | sed 's/[\/&]/\\&/g')/" run.sh
+          chmod +x run.sh
+          ./run.sh ${{matrix.agent}} 2>&1 | tee ${{matrix.agent}}.log
+      - name: Verify ${{matrix.agent}} pipeline tests
+        id: verify_tests
+        if: always()
+        run: |
+          TEST_RESULTS=$(cat $GITHUB_WORKSPACE/logging/fluent-pipeline-test/${{matrix.agent}}}.log | awk -v RS='\r?\n' '/^--- Report of &{} pipeline testing ---$/ && !found {found=1; print; next} found && /^{"time":/ {exit} found')
+          if [[ -z "$TEST_RESULTS" ]]; then
+            echo "${{matrix.agent}} pipeline tests failed. Check logs in ${{matrix.agent}}.log"; exit 1
+            echo "test_results=${{matrix.agent}} pipeline tests failed. Check logs in ${{matrix.agent}}.log" >> $GITHUB_OUTPUT
+            echo "status=failed" >> $GITHUB_OUTPUT
+          else
+          cat <<EOF >> $GITHUB_OUTPUT
+          test_results<<END
+          $TEST_RESULTS
+          END
+          EOF
+
+            if grep -q "\"testing.go:35\",\"msg\":\"Check finished successfully!\"" $GITHUB_WORKSPACE/logging/fluent-pipeline-test/${{matrix.agent}}.log; then
+              echo "${{matrix.agent}} pipeline tests passed"
+              echo "status=passed" >> $GITHUB_OUTPUT
+            else
+              echo "${{matrix.agent}} pipeline tests failed. Check logs in ${{matrix.agent}}.log"; echo "status=failed" >> $GITHUB_OUTPUT; exit 1
+            fi
+          fi
+      - name: Save artifacts
+        if: always()
+        run: |
+          mkdir -p artifacts
+          cp $GITHUB_WORKSPACE/logging/fluent-pipeline-test/fluentbit.log artifacts/
+          cp -r $GITHUB_WORKSPACE/logging/fluent-pipeline-test/tests artifacts/
+
+      - name: Generate artifact name
+        id: generate_artifact
+        if: always()
+        env:
+          HEAD_REF: ${{ github.head_ref || github.ref_name }}
+        run: |
+          # ▶️ Generate artifact name
+          release_name=$(echo "$HEAD_REF" | tr '[:upper:]' '[:lower:]' | tr '/' '_' || echo "")
+          ARTIFACT_NAME="${{ github.job }}_${release_name}_${{ matrix.agent }}_artifacts_$(date -u +'%Y%m%d%H%M%S')"
+          echo "ARTIFACT_NAME=$ARTIFACT_NAME" >> $GITHUB_OUTPUT
+        shell: bash
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ${{ steps.generate_artifact.outputs.ARTIFACT_NAME }}
+          path: artifacts/
+
+      - name: Generate Status Summary
+        if: always()
+        run: |
+          echo "## ${{matrix.agent}} pipeline test" >> $GITHUB_STEP_SUMMARY
+          echo "Status: ${{ steps.verify_tests.outputs.status || '❓unknown' }}" >> $GITHUB_STEP_SUMMARY
+          echo "Test results: ${{ steps.verify_tests.outputs.test_results || '❓unknown' }}" >> $GITHUB_STEP_SUMMARY
