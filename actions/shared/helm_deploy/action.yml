@@ -143,6 +143,11 @@ runs:
           helm ${{inputs.deploy_mode}} ${{inputs.service_name}} . -f $template_name -n ${{inputs.namespace}} --timeout 10m --skip-crds
         fi
 
+    - name: Get pods
+      if: always()
+      shell: bash
+      run: kubectl get pods -n ${{inputs.namespace}}
+
     - name: Get docker images
       shell: bash
       # language=bash
