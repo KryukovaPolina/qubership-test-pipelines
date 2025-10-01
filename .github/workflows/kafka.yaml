@@ -36,7 +36,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: '${{inputs.service_branch}}'
-          repository: 'Netcracker/qubership-kafka'
+          repository: 'KryukovaPolina/qubership-kafka'
           path: 'qubership-kafka'
       - name: Process versions file
         id: process-versions
@@ -58,7 +58,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: '${{inputs.pipeline_branch}}'
-          repository: 'Netcracker/qubership-test-pipelines'
+          repository: 'KryukovaPolina/qubership-test-pipelines'
           path: 'qubership-test-pipelines'
       - name: Create cluster
         uses: ./qubership-test-pipelines/actions/shared/create_cluster
@@ -109,7 +109,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: '${{inputs.pipeline_branch}}'
-          repository: 'Netcracker/qubership-test-pipelines'
+          repository: 'KryukovaPolina/qubership-test-pipelines'
           path: 'qubership-test-pipelines'
       - name: Create cluster
         uses: ./qubership-test-pipelines/actions/shared/create_cluster
@@ -147,7 +147,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: '${{inputs.pipeline_branch}}'
-          repository: 'Netcracker/qubership-test-pipelines'
+          repository: 'KryukovaPolina/qubership-test-pipelines'
           path: 'qubership-test-pipelines'
       - name: Create cluster
         uses: ./qubership-test-pipelines/actions/shared/create_cluster
@@ -212,7 +212,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: '${{inputs.pipeline_branch}}'
-          repository: 'Netcracker/qubership-test-pipelines'
+          repository: 'KryukovaPolina/qubership-test-pipelines'
           path: 'qubership-test-pipelines'
       - name: Create cluster
         uses: ./qubership-test-pipelines/actions/shared/create_cluster
@@ -280,7 +280,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: '${{inputs.pipeline_branch}}'
-          repository: 'Netcracker/qubership-test-pipelines'
+          repository: 'KryukovaPolina/qubership-test-pipelines'
           path: 'qubership-test-pipelines'
       - name: Create cluster
         uses: ./qubership-test-pipelines/actions/shared/create_cluster
@@ -333,7 +333,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: '${{inputs.pipeline_branch}}'
-          repository: 'Netcracker/qubership-test-pipelines'
+          repository: 'KryukovaPolina/qubership-test-pipelines'
           path: 'qubership-test-pipelines'
       - name: Create cluster
         uses: ./qubership-test-pipelines/actions/shared/create_cluster
